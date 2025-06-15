@@ -15,9 +15,9 @@ router.post('/generate', uploadSingle, validateRemedyFormData, async (req, res) 
   try {
     console.log('Generate remedy - Body:', req.body);
     console.log('Generate remedy - File:', req.file ? 'File uploaded' : 'No file');
-
+    
     const { disease, age, gender, constitution, symptoms, severity, allergies } = req.body;
-
+    
     if (!req.file) {
       console.error('No file uploaded');
       return res.status(400).json({
@@ -47,29 +47,24 @@ router.post('/generate', uploadSingle, validateRemedyFormData, async (req, res) 
       user = savedUser._id;
     }
 
-    const userProfile = {
-      age: parseInt(age),
-      gender,
-      constitution: constitution || 'Tri-Dosha'
-    };
+    // Generate user profile
+    const userProfile = { age: parseInt(age), gender, constitution: constitution || 'Tri-Dosha' };
 
-    // Identify herb using AI
+    // Identify herb using AI (condition-based since image analysis isn't available)
     const identificationResult = await aiService.identifyHerb(req.file.path, disease, userProfile);
-
-    // Generate remedy
     const remedyRecommendation = await aiService.generateRemedy(
       identificationResult,
       userProfile,
       disease
     );
 
-    // Translate to Hindi
+    // Translate the remedy to Hindi
     const hindiRemedy = await aiService.translateRemedy(remedyRecommendation.primary.instructions, 'hi');
 
-    // Clean up uploaded image file
+    // Cleanup uploaded file
     await aiService.cleanupFile(req.file.path);
 
-    // Save to database
+    // Save remedy to database
     const remedy = new Remedy({
       user,
       sessionId,
@@ -108,10 +103,10 @@ router.post('/generate', uploadSingle, validateRemedyFormData, async (req, res) 
       language: 'hi'
     });
 
-    await remedy.save();
+    const savedRemedy = await remedy.save();
 
-    // ✅ Final fixed response block
-    res.status(200).json({
+    // Format response
+    const response = {
       success: true,
       data: {
         sessionId,
@@ -121,7 +116,7 @@ router.post('/generate', uploadSingle, validateRemedyFormData, async (req, res) 
           sanskritName: identificationResult.name.sanskrit,
           confidence: identificationResult.confidence
         },
-        remedy: hindiRemedy,
+        remedy: hindiRemedy, // Return Hindi remedy by default
         isVerified: remedyRecommendation.ayushCompliance !== false,
         confidence: identificationResult.confidence,
         language: 'hi',
@@ -131,22 +126,24 @@ router.post('/generate', uploadSingle, validateRemedyFormData, async (req, res) 
           followUp: remedyRecommendation.followUp
         }
       }
-    });
+    };
+
+    res.status(200).json(response);
 
   } catch (error) {
     console.error('Remedy generation error:', error);
-
+    
+    // Cleanup uploaded file even on error
     if (req.file && req.file.path) {
       await aiService.cleanupFile(req.file.path);
     }
-
+    
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to generate remedy. Please try again.'
     });
   }
 });
-
 
 // @desc    Get remedy by session ID
 // @route   GET /api/remedies/:sessionId
