@@ -7,7 +7,6 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { BACKEND_URL } from '../config'; // adjust path as needed
 
 // Import configurations and routes
 import connectDB from './config/database.js';
