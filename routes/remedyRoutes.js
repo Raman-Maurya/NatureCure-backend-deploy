@@ -128,8 +128,7 @@ router.post('/generate', uploadSingle, validateRemedyFormData, async (req, res) 
       }
     };
 
-    //res.status(200).json(response);
-    res.json({ success: true, data: { ...response } })
+    res.status(200).json(response);
 
 
   } catch (error) {
