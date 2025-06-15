@@ -128,7 +128,9 @@ router.post('/generate', uploadSingle, validateRemedyFormData, async (req, res) 
       }
     };
 
-    res.status(200).json(response);
+    //res.status(200).json(response);
+    res.json({ success: true, data: { ...response } })
+
 
   } catch (error) {
     console.error('Remedy generation error:', error);
