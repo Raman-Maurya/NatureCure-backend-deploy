@@ -58,9 +58,6 @@ router.post('/generate', uploadSingle, validateRemedyFormData, async (req, res) 
       disease
     );
 
-    // Translate the remedy to Hindi
-    const hindiRemedy = await aiService.translateRemedy(remedyRecommendation.primary.instructions, 'hi');
-
     // Cleanup uploaded file
     await aiService.cleanupFile(req.file.path);
 
@@ -100,7 +97,7 @@ router.post('/generate', uploadSingle, validateRemedyFormData, async (req, res) 
         ...identificationResult.aiMetadata,
         ...remedyRecommendation.aiMetadata
       },
-      language: 'hi'
+      language: 'en'
     });
 
     const savedRemedy = await remedy.save();
@@ -116,10 +113,10 @@ router.post('/generate', uploadSingle, validateRemedyFormData, async (req, res) 
           sanskritName: identificationResult.name.sanskrit,
           confidence: identificationResult.confidence
         },
-        remedy: hindiRemedy, // Return Hindi remedy by default
+        remedy: remedyRecommendation.primary.instructions, // Return English remedy by default
         isVerified: remedyRecommendation.ayushCompliance !== false,
         confidence: identificationResult.confidence,
-        language: 'hi',
+        language: 'en',
         remedyDetails: {
           primary: remedyRecommendation.primary,
           supportive: remedyRecommendation.supportive,
