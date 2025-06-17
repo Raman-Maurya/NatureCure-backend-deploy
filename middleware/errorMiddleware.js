@@ -13,7 +13,7 @@ const errorHandler = (err, req, res, next) => {
   // Add CORS headers to error responses
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Headers', '*');
 
   // Handle specific error types
   if (err.name === 'CastError' && err.kind === 'ObjectId') {
@@ -69,7 +69,8 @@ const errorHandler = (err, req, res, next) => {
   res.status(statusCode).json({
     success: false,
     error: message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    // Always include stack trace since we're hardcoding development mode
+    stack: err.stack,
     timestamp: new Date().toISOString(),
     // Add fallback data structure for frontend in case of error
     data: {

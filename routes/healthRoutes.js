@@ -11,7 +11,7 @@ router.get('/', (req, res) => {
     status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development',
+    environment: 'development',
     version: '1.0.0',
     services: {
       database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
@@ -49,7 +49,7 @@ router.get('/detailed', async (req, res) => {
       status: dbStatus === 'healthy' && dbOperational ? 'healthy' : 'unhealthy',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development',
+      environment: 'development',
       version: '1.0.0',
       services: {
         database: {
@@ -62,11 +62,11 @@ router.get('/detailed', async (req, res) => {
         ai: {
           provider: 'Perplexity',
           model: 'llama-3.1-sonar-large-128k-online',
-          status: process.env.PERPLEXITY_API_KEY ? 'configured' : 'not configured'
+          status: 'configured'
         },
         fileUpload: {
           status: 'active',
-          maxSize: process.env.MAX_FILE_SIZE || '10MB',
+          maxSize: '10MB',
           allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
         }
       },

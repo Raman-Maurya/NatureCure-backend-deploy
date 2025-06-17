@@ -6,8 +6,8 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Ensure upload directory exists
-const uploadDir = path.join(__dirname, '..', process.env.UPLOAD_DIR || 'uploads');
+// Ensure upload directory exists with hardcoded path
+const uploadDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -38,11 +38,11 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Configure multer
+// Configure multer with hardcoded file size limit
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024, // 10MB default
+    fileSize: 10 * 1024 * 1024, // 10MB hardcoded
     files: 1 // Only one file at a time
   },
   fileFilter: fileFilter
