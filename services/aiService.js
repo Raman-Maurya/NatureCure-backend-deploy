@@ -148,30 +148,12 @@ Focus on identifying medicinal herbs, spices, or plant materials commonly used i
     try {
       console.log(`💊 Generating remedy using Perplexity for: ${identifiedHerb.name.common} to treat ${condition}`);
 
-      // Ensure required parameters are present
-      if (!identifiedHerb || !identifiedHerb.name || !identifiedHerb.name.common) {
-        console.error('❌ Invalid herb data provided to generateRemedy');
-        throw new Error('Invalid herb identification data');
-      }
-
-      if (!condition) {
-        console.error('❌ No condition provided to generateRemedy');
-        throw new Error('Treatment condition is required');
-      }
-
-      // Validate user profile and set defaults if missing
-      const validatedProfile = {
-        age: userProfile?.age || 'Adult',
-        gender: userProfile?.gender || 'Not specified',
-        constitution: userProfile?.constitution || 'Not specified'
-      };
-
       const prompt = `As an expert in Ayurvedic medicine, create a comprehensive herbal remedy using ${identifiedHerb.name.common} ${identifiedHerb.name.scientific ? `(${identifiedHerb.name.scientific})` : ''} to treat ${condition}.
 
 Patient Profile:
-- Age: ${validatedProfile.age}
-- Gender: ${validatedProfile.gender}
-- Constitution: ${validatedProfile.constitution}
+- Age: ${userProfile.age || 'Adult'}
+- Gender: ${userProfile.gender || 'Not specified'}
+- Constitution: ${userProfile.constitution || 'Not specified'}
 
 Please provide a detailed remedy including:
 
@@ -205,7 +187,7 @@ Please provide a detailed remedy including:
 
 Ensure the remedy follows traditional Ayurvedic principles and is safe for the specified age and gender. Include relevant Sanskrit terms where appropriate.`;
 
-      const requestBody = {
+      const response = await this.makeAPICallWithRetry(this.perplexityBaseURL, {
         model: this.perplexityModel,
         messages: [
           {
@@ -219,45 +201,17 @@ Ensure the remedy follows traditional Ayurvedic principles and is safe for the s
         ],
         max_tokens: 1500,
         temperature: 0.2
-      };
-
-      console.log('📤 Perplexity API request prepared');
-
-      // Use retry mechanism with timeout handling
-      const response = await this.makeAPICallWithRetry(
-        this.perplexityBaseURL, 
-        requestBody, 
-        {
-          headers: {
-            Authorization: `Bearer ${this.perplexityApiKey}`,
-            "Content-Type": "application/json",
-          },
-          timeout: 30000
+      }, {
+        headers: {
+          Authorization: `Bearer ${this.perplexityApiKey}`,
+          "Content-Type": "application/json",
         },
-        3 // Max retries
-      );
-
-      if (!response || !response.data) {
-        throw new Error('No response received from remedy generation service');
-      }
-
-      console.log('📨 Perplexity API Response status:', response.status);
-
-      // Validate response data
-      if (!response.data.choices || !response.data.choices[0] || !response.data.choices[0].message) {
-        console.error('❌ Invalid response structure from Perplexity API:', JSON.stringify(response.data));
-        throw new Error('Invalid response from remedy generation service');
-      }
+        timeout: 30000
+      });
 
       const remedyText = response.data.choices[0].message.content;
       
-      if (!remedyText || remedyText.trim() === '') {
-        console.error('❌ Empty remedy text received');
-        throw new Error('Failed to generate remedy content');
-      }
-      
       console.log('✅ Remedy generated successfully using Perplexity');
-      console.log('📏 Response length:', remedyText.length);
 
       // Parse the structured remedy response
       const parsedRemedy = this.parseRemedyResponse(remedyText, identifiedHerb);
@@ -267,7 +221,7 @@ Ensure the remedy follows traditional Ayurvedic principles and is safe for the s
         supportive: parsedRemedy.supportive,
         followUp: parsedRemedy.followUp,
         ayushCompliance: true,
-        confidence: identifiedHerb.confidence || 70,
+        confidence: identifiedHerb.confidence,
         aiMetadata: {
           model: this.perplexityModel,
           service: 'perplexity',
@@ -284,40 +238,7 @@ Ensure the remedy follows traditional Ayurvedic principles and is safe for the s
         console.error('Response status:', error.response.status);
         console.error('Response data:', error.response.data);
       }
-
-      // Return a fallback structure instead of throwing error
-      // This ensures frontend always gets a valid response structure
-      return {
-        primary: {
-          instructions: `We're sorry, but we couldn't generate a specific remedy at this time. For ${condition}, consider consulting with an Ayurvedic practitioner for personalized advice.`,
-          herbs: [{
-            name: identifiedHerb?.name?.common || 'Herb',
-            description: identifiedHerb?.description || 'No description available',
-            properties: identifiedHerb?.properties || 'Properties not available'
-          }]
-        },
-        supportive: {
-          lifestyle: 'Rest adequately and maintain hydration.',
-          diet: 'Follow a balanced diet suitable for your constitution.',
-          yoga: 'Practice gentle yoga as appropriate for your condition.'
-        },
-        followUp: {
-          duration: '2-4 weeks',
-          monitoring: 'Monitor symptoms and seek professional advice if condition persists.',
-          nextSteps: 'Consult an Ayurvedic practitioner for personalized treatment.'
-        },
-        ayushCompliance: true,
-        confidence: 50,
-        aiMetadata: {
-          model: this.perplexityModel,
-          service: 'perplexity',
-          tokens: {
-            input: 0,
-            output: 0
-          },
-          error: error.message
-        }
-      };
+      throw new Error(`Failed to generate remedy: ${error.message}`);
     }
   }
 
@@ -429,19 +350,6 @@ Ensure the remedy follows traditional Ayurvedic principles and is safe for the s
         console.log(`🔄 API Call attempt ${attempt}/${maxRetries}`);
         const response = await axios.post(url, data, config);
         console.log(`✅ API Call successful on attempt ${attempt}`);
-        
-        // Add response size logging for debugging
-        if (response.data) {
-          const responseSize = JSON.stringify(response.data).length;
-          console.log(`📊 Response data size: ${responseSize} bytes`);
-          
-          if (responseSize < 100) {
-            console.warn(`⚠️ Warning: Response data seems unusually small (${responseSize} bytes)`);
-          }
-        } else {
-          console.warn('⚠️ Warning: Empty response data received');
-        }
-        
         return response;
       } catch (error) {
         console.log(`❌ API Call failed on attempt ${attempt}:`, error.response?.status, error.message);
@@ -465,21 +373,8 @@ Ensure the remedy follows traditional Ayurvedic principles and is safe for the s
   // Parse structured remedy response from Perplexity
   parseRemedyResponse(remedyText, identifiedHerb) {
     try {
-      console.log('🔍 Parsing remedy response');
-      
-      if (!remedyText || !identifiedHerb) {
-        throw new Error('Missing remedyText or identifiedHerb for parsing');
-      }
-
-      // Extract sections if possible
-      const sections = {
-        preparation: this.extractSection(remedyText, ['preparation', 'method', 'prepare'], 150),
-        dosage: this.extractSection(remedyText, ['dosage', 'administration', 'take'], 100),
-        dietary: this.extractSection(remedyText, ['diet', 'food', 'avoid', 'include'], 100),
-        precautions: this.extractSection(remedyText, ['precaution', 'contraindication', 'side effect', 'avoid'], 100),
-        timeline: this.extractSection(remedyText, ['result', 'timeline', 'expect', 'improvement'], 80),
-      };
-
+      // For now, return the full remedy text as primary instructions
+      // You can enhance this to parse different sections later
       return {
         primary: {
           instructions: remedyText,
@@ -487,27 +382,6 @@ Ensure the remedy follows traditional Ayurvedic principles and is safe for the s
             name: identifiedHerb.name.common,
             description: identifiedHerb.description || '',
             properties: identifiedHerb.properties || ''
-          }]
-        },
-        supportive: {
-          lifestyle: sections.lifestyle || '',
-          diet: sections.dietary || '',
-          yoga: ''
-        },
-        followUp: {
-          duration: sections.timeline || '2-4 weeks',
-          monitoring: 'Monitor symptoms and adjust as needed',
-          nextSteps: 'Consult an Ayurvedic practitioner if symptoms persist'
-        }
-      };
-    } catch (error) {
-      console.error('Error parsing remedy response:', error);
-      return {
-        primary: {
-          instructions: remedyText || 'Remedy information not available',
-          herbs: [{
-            name: identifiedHerb?.name?.common || 'Unknown Herb',
-            description: ''
           }]
         },
         supportive: {
@@ -521,35 +395,19 @@ Ensure the remedy follows traditional Ayurvedic principles and is safe for the s
           nextSteps: 'Consult an Ayurvedic practitioner if symptoms persist'
         }
       };
-    }
-  }
-
-  // Helper method to extract sections from remedy text
-  extractSection(text, keywordList, maxLength = 100) {
-    try {
-      // If no text or keywords, return empty
-      if (!text || !keywordList || keywordList.length === 0) {
-        return '';
-      }
-
-      const paragraphs = text.split(/\n\n+/);
-      
-      // Try to find paragraphs containing keywords
-      for (const keyword of keywordList) {
-        const matchingParagraphs = paragraphs.filter(p => 
-          p.toLowerCase().includes(keyword.toLowerCase())
-        );
-        
-        if (matchingParagraphs.length > 0) {
-          return matchingParagraphs[0].substring(0, maxLength) + 
-                 (matchingParagraphs[0].length > maxLength ? '...' : '');
-        }
-      }
-      
-      return '';
     } catch (error) {
-      console.error('Error extracting section:', error);
-      return '';
+      console.error('Error parsing remedy response:', error);
+      return {
+        primary: {
+          instructions: remedyText,
+          herbs: [{
+            name: identifiedHerb.name.common,
+            description: ''
+          }]
+        },
+        supportive: {},
+        followUp: {}
+      };
     }
   }
 

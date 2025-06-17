@@ -10,11 +10,6 @@ const errorHandler = (err, req, res, next) => {
   let statusCode = res.statusCode === 200 ? 500 : res.statusCode;
   let message = err.message;
 
-  // Add CORS headers to error responses
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', '*');
-
   // Handle specific error types
   if (err.name === 'CastError' && err.kind === 'ObjectId') {
     statusCode = 404;
@@ -42,15 +37,6 @@ const errorHandler = (err, req, res, next) => {
     message = 'Token expired';
   }
 
-  // Handle CORS errors
-  if (message.includes('Not allowed by CORS')) {
-    statusCode = 403;
-    message = 'Cross-Origin Request Blocked: The request origin is not authorized';
-    
-    // Log the request origin for debugging
-    console.error(`CORS Error: ${req.headers.origin} tried to access ${req.originalUrl}`);
-  }
-
   // Multer errors
   if (err.code === 'LIMIT_FILE_SIZE') {
     statusCode = 400;
@@ -62,23 +48,11 @@ const errorHandler = (err, req, res, next) => {
     message = 'Too many files uploaded';
   }
 
-  // Always ensure content-type is set for consistency
-  res.setHeader('Content-Type', 'application/json');
-
-  // Send the error response
   res.status(statusCode).json({
     success: false,
     error: message,
-    // Always include stack trace since we're hardcoding development mode
-    stack: err.stack,
-    timestamp: new Date().toISOString(),
-    // Add fallback data structure for frontend in case of error
-    data: {
-      remedy: "We encountered an error processing your request. Please try again or contact support if the problem persists.",
-      isVerified: false,
-      confidence: 0,
-      language: 'en'
-    }
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    timestamp: new Date().toISOString()
   });
 };
 

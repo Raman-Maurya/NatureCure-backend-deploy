@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
+import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -16,6 +17,9 @@ import remedyRoutes from './routes/remedyRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import herbRoutes from './routes/herbRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
+
+// Load environment variables
+dotenv.config();
 
 // Get directory name for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -30,10 +34,10 @@ connectDB();
 // Trust proxy
 app.set('trust proxy', 1);
 
-// Rate limiting - hardcoded values
+// Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
   message: {
     error: 'Too many requests from this IP, please try again later.'
   },
@@ -49,22 +53,18 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// CORS configuration with hardcoded values
+// CORS configuration
 app.use(cors({
-  origin: ['http://localhost:5173', 'https://naturecure.netlify.app', 'https://herbheal.netlify.app'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: '*', // Allow all headers
-  credentials: false, // Don't require credentials
-  optionsSuccessStatus: 200,
-  maxAge: 3600,
-  exposedHeaders: ['Content-Length', 'Content-Type']
+  origin: 'https://naturecure.netlify.app'|| 'http://localhost:5173',
+  credentials: true,
+  optionsSuccessStatus: 200
 }));
 
 // Compression middleware
 app.use(compression());
 
-// Logging middleware - hardcoded to 'dev' mode
-app.use(morgan('dev'));
+// Logging middleware
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -93,13 +93,13 @@ app.use('/api/herbs', herbRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
-// Start server with hardcoded port
-const PORT = 5000;
+// Start server
+const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`🌿 HerbHeal API Server running on port ${PORT}`);
-  console.log(`📍 Environment: development`);
-  console.log(`🔗 CORS enabled for: http://localhost:5173, https://naturecure.netlify.app, https://herbheal.netlify.app`);
+  console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 CORS enabled for: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
 });
 
 export default app; 

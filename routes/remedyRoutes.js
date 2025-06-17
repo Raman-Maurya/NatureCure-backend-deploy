@@ -31,152 +31,76 @@ router.post('/generate', uploadSingle, validateRemedyFormData, async (req, res) 
 
     // Create or find anonymous user
     let user = null;
-    try {
-      if (req.user) {
-        user = req.user._id;
-      } else {
-        // Create anonymous user entry for tracking
-        const anonymousUser = new User({
-          name: 'Anonymous User',
-          email: `anonymous_${sessionId}@herbheal.app`,
-          password: 'anonymous',
-          age: parseInt(age) || 30,
-          gender: gender || 'Not specified',
-          constitution: constitution || 'Tri-Dosha'
-        });
-        const savedUser = await anonymousUser.save();
-        user = savedUser._id;
-      }
-    } catch (userError) {
-      console.error('User creation error:', userError);
-      // Continue without user if there's an issue with user creation
-      user = null;
+    if (req.user) {
+      user = req.user._id;
+    } else {
+      // Create anonymous user entry for tracking
+      const anonymousUser = new User({
+        name: 'Anonymous User',
+        email: `anonymous_${sessionId}@herbheal.app`,
+        password: 'anonymous',
+        age: parseInt(age),
+        gender,
+        constitution: constitution || 'Tri-Dosha'
+      });
+      const savedUser = await anonymousUser.save();
+      user = savedUser._id;
     }
 
     // Generate user profile
-    const userProfile = { 
-      age: parseInt(age) || 30, 
-      gender: gender || 'Not specified', 
-      constitution: constitution || 'Tri-Dosha' 
-    };
+    const userProfile = { age: parseInt(age), gender, constitution: constitution || 'Tri-Dosha' };
 
-    // Identify herb using AI
-    let identificationResult;
-    let remedyRecommendation;
-    
-    try {
-      console.log('📷 Identifying herb from image...');
-      identificationResult = await aiService.identifyHerb(req.file.path, disease, userProfile);
-      
-      if (!identificationResult || !identificationResult.name) {
-        throw new Error('Failed to identify herb from image');
-      }
-      
-      console.log('🌿 Generating remedy for identified herb...');
-      remedyRecommendation = await aiService.generateRemedy(
-        identificationResult,
-        userProfile,
-        disease
-      );
-      
-      if (!remedyRecommendation || !remedyRecommendation.primary) {
-        throw new Error('Failed to generate remedy recommendation');
-      }
-    } catch (aiError) {
-      console.error('AI service error:', aiError);
-      
-      // Create fallback identification if AI fails
-      if (!identificationResult) {
-        identificationResult = {
-          generatedId: 'unknown-herb',
-          name: {
-            common: 'Unknown Herb',
-            scientific: '',
-            sanskrit: ''
-          },
-          confidence: 10,
-          alternativeMatches: [],
-          description: 'Could not accurately identify the herb in the image.'
-        };
-      }
-      
-      // Create fallback remedy if AI fails
-      if (!remedyRecommendation) {
-        remedyRecommendation = {
-          primary: {
-            instructions: `We couldn't generate a specific remedy for this herb. Please consult with an Ayurvedic practitioner for guidance on using this herb to treat ${disease}.`,
-            herbs: [{
-              name: identificationResult.name.common,
-              description: '',
-              properties: ''
-            }]
-          },
-          supportive: {
-            lifestyle: '',
-            diet: '',
-            yoga: ''
-          },
-          followUp: {
-            duration: '2-4 weeks',
-            monitoring: 'Monitor symptoms and seek professional advice if condition persists.',
-            nextSteps: 'Consult an Ayurvedic practitioner for personalized treatment.'
-          },
-          ayushCompliance: false,
-          confidence: 10
-        };
-      }
-    }
+    // Identify herb using AI (condition-based since image analysis isn't available)
+    const identificationResult = await aiService.identifyHerb(req.file.path, disease, userProfile);
+    const remedyRecommendation = await aiService.generateRemedy(
+      identificationResult,
+      userProfile,
+      disease
+    );
 
     // Cleanup uploaded file
     await aiService.cleanupFile(req.file.path);
 
-    try {
-      // Save remedy to database
-      const remedy = new Remedy({
-        user,
-        sessionId,
-        input: {
-          condition: disease,
-          age: parseInt(age) || 30,
-          gender: gender || 'Not specified',
-          constitution: constitution || 'Tri-Dosha',
-          symptoms: symptoms ? symptoms.split(',').map(s => s.trim()) : [],
-          severity: severity || 'Moderate',
-          allergies: allergies ? allergies.split(',').map(a => a.trim()) : []
-        },
-        uploadedImage: {
-          filename: req.file.filename,
-          originalName: req.file.originalname,
-          mimetype: req.file.mimetype,
-          size: req.file.size,
-          path: req.file.path
-        },
-        identifiedHerb: {
-          generatedId: identificationResult.generatedId,
-          name: identificationResult.name,
-          confidence: identificationResult.confidence,
-          alternativeMatches: identificationResult.alternativeMatches || []
-        },
-        remedyRecommendation,
-        verification: {
-          status: 'AI-Generated',
-          confidence: identificationResult.confidence,
-          ayushCompliance: remedyRecommendation.ayushCompliance !== false
-        },
-        aiMetadata: {
-          ...identificationResult.aiMetadata,
-          ...remedyRecommendation.aiMetadata
-        },
-        language: 'en'
-      });
+    // Save remedy to database
+    const remedy = new Remedy({
+      user,
+      sessionId,
+      input: {
+        condition: disease,
+        age: parseInt(age),
+        gender,
+        constitution: constitution || 'Tri-Dosha',
+        symptoms: symptoms ? symptoms.split(',').map(s => s.trim()) : [],
+        severity: severity || 'Moderate',
+        allergies: allergies ? allergies.split(',').map(a => a.trim()) : []
+      },
+      uploadedImage: {
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        path: req.file.path
+      },
+      identifiedHerb: {
+        generatedId: identificationResult.generatedId,
+        name: identificationResult.name,
+        confidence: identificationResult.confidence,
+        alternativeMatches: identificationResult.alternativeMatches || []
+      },
+      remedyRecommendation,
+      verification: {
+        status: 'AI-Generated',
+        confidence: identificationResult.confidence,
+        ayushCompliance: remedyRecommendation.ayushCompliance !== false
+      },
+      aiMetadata: {
+        ...identificationResult.aiMetadata,
+        ...remedyRecommendation.aiMetadata
+      },
+      language: 'en'
+    });
 
-      const savedRemedy = await remedy.save();
-      console.log('✅ Remedy saved to database with ID:', savedRemedy._id);
-    } catch (dbError) {
-      console.error('Database error:', dbError);
-      // Continue without saving to database if there's an issue
-      // The user will still get the remedy response
-    }
+    const savedRemedy = await remedy.save();
 
     // Format response
     const response = {
@@ -201,49 +125,21 @@ router.post('/generate', uploadSingle, validateRemedyFormData, async (req, res) 
       }
     };
 
-    console.log('📤 Sending response to client');
-    
-    // Explicitly set content type and other headers to avoid empty responses
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Transfer-Encoding', 'chunked');
-    
-    // Convert to string and set content length explicitly
-    const responseJson = JSON.stringify(response);
-    res.setHeader('Content-Length', Buffer.byteLength(responseJson, 'utf8'));
-    
-    // Send the response as a string
-    return res.status(200).send(responseJson);
+    res.status(200).json(response);
+
 
   } catch (error) {
-    console.error('❌ Remedy generation error:', error);
+    console.error('Remedy generation error:', error);
     
     // Cleanup uploaded file even on error
     if (req.file && req.file.path) {
       await aiService.cleanupFile(req.file.path);
     }
-
-    // Format error response with fallback data
-    const errorResponse = {
+    
+    res.status(500).json({
       success: false,
-      error: error.message || 'Failed to generate remedy. Please try again.',
-      data: {
-        remedy: "We encountered an error processing your request. Please try again or contact support if the problem persists.",
-        isVerified: false,
-        confidence: 0,
-        language: 'en'
-      }
-    };
-
-    // Explicitly set content type and other headers
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Transfer-Encoding', 'chunked');
-    
-    // Convert to string and set content length explicitly
-    const errorResponseJson = JSON.stringify(errorResponse);
-    res.setHeader('Content-Length', Buffer.byteLength(errorResponseJson, 'utf8'));
-    
-    // Return the error response as a string
-    return res.status(500).send(errorResponseJson);
+      error: error.message || 'Failed to generate remedy. Please try again.'
+    });
   }
 });
 
