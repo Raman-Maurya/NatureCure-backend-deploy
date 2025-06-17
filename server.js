@@ -55,9 +55,31 @@ app.use(helmet({
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in whitelist
+    const whitelist = [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'https://naturecure.netlify.app',
+      'https://herbheal.netlify.app',
+      process.env.CLIENT_URL
+    ].filter(Boolean); // Filter out undefined values
+    
+    if (process.env.NODE_ENV !== 'production' || whitelist.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn(`Origin ${origin} not allowed by CORS policy`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  maxAge: 3600
 }));
 
 // Compression middleware
