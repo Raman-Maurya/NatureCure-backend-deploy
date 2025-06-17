@@ -53,28 +53,9 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// CORS configuration
+// CORS configuration with hardcoded values
 app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Check if origin is in whitelist
-    const whitelist = [
-      'http://localhost:5173',
-      'http://localhost:3000',
-      'https://naturecure.netlify.app',
-      'https://herbheal.netlify.app',
-      process.env.CLIENT_URL
-    ].filter(Boolean); // Filter out undefined values
-    
-    if (process.env.NODE_ENV !== 'production' || whitelist.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      console.warn(`Origin ${origin} not allowed by CORS policy`);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: ['http://localhost:5173', 'https://naturecure.netlify.app', 'https://herbheal.netlify.app'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
   credentials: true,

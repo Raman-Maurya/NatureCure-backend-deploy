@@ -429,6 +429,19 @@ Ensure the remedy follows traditional Ayurvedic principles and is safe for the s
         console.log(`🔄 API Call attempt ${attempt}/${maxRetries}`);
         const response = await axios.post(url, data, config);
         console.log(`✅ API Call successful on attempt ${attempt}`);
+        
+        // Add response size logging for debugging
+        if (response.data) {
+          const responseSize = JSON.stringify(response.data).length;
+          console.log(`📊 Response data size: ${responseSize} bytes`);
+          
+          if (responseSize < 100) {
+            console.warn(`⚠️ Warning: Response data seems unusually small (${responseSize} bytes)`);
+          }
+        } else {
+          console.warn('⚠️ Warning: Empty response data received');
+        }
+        
         return response;
       } catch (error) {
         console.log(`❌ API Call failed on attempt ${attempt}:`, error.response?.status, error.message);
