@@ -202,7 +202,17 @@ router.post('/generate', uploadSingle, validateRemedyFormData, async (req, res) 
     };
 
     console.log('📤 Sending response to client');
-    return res.status(200).json(response);
+    
+    // Explicitly set content type and other headers to avoid empty responses
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Transfer-Encoding', 'chunked');
+    
+    // Convert to string and set content length explicitly
+    const responseJson = JSON.stringify(response);
+    res.setHeader('Content-Length', Buffer.byteLength(responseJson, 'utf8'));
+    
+    // Send the response as a string
+    return res.status(200).send(responseJson);
 
   } catch (error) {
     console.error('❌ Remedy generation error:', error);
@@ -212,8 +222,8 @@ router.post('/generate', uploadSingle, validateRemedyFormData, async (req, res) 
       await aiService.cleanupFile(req.file.path);
     }
 
-    // Return a graceful error response
-    return res.status(500).json({
+    // Format error response with fallback data
+    const errorResponse = {
       success: false,
       error: error.message || 'Failed to generate remedy. Please try again.',
       data: {
@@ -222,7 +232,18 @@ router.post('/generate', uploadSingle, validateRemedyFormData, async (req, res) 
         confidence: 0,
         language: 'en'
       }
-    });
+    };
+
+    // Explicitly set content type and other headers
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Transfer-Encoding', 'chunked');
+    
+    // Convert to string and set content length explicitly
+    const errorResponseJson = JSON.stringify(errorResponse);
+    res.setHeader('Content-Length', Buffer.byteLength(errorResponseJson, 'utf8'));
+    
+    // Return the error response as a string
+    return res.status(500).send(errorResponseJson);
   }
 });
 
