@@ -4,17 +4,11 @@ import path from 'path';
 
 class AIService {
   constructor() {
-    // Gemini configuration for herb identification
-    this.geminiApiKey = "AIzaSyC60wbbc32g7OcuA0mgusySiOQhNa4nPf8" ;
-    this.geminiBaseURL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+    // Gemini configuration for herb identification and remedy generation
+    this.geminiApiKey = "AIzaSyAq0ugr7Gwm-7VpancppZI3zDIbuIpX7SQ";
+    this.geminiBaseURL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
     
-    // Perplexity configuration for remedy generation
-    this.perplexityApiKey = "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";
-    this.perplexityBaseURL = 'https://api.perplexity.ai/chat/completions';
-    this.perplexityModel = 'llama-3.1-sonar-large-128k-online'; // Premium Perplexity model
-    
-    console.log('✅ Gemini Vision API configured');
-    console.log('✅ Perplexity API configured (Premium model)');
+    console.log('✅ Gemini API configured for herb identification & remedy generation');
   }
 
   // Extract herb name from image using Gemini Vision
@@ -85,7 +79,7 @@ Focus on identifying medicinal herbs, spices, or plant materials commonly used i
       };
       
       console.log('📤 Request structure:', {
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash-lite',
         hasImage: true,
         promptLength: prompt.length
       });
@@ -124,7 +118,8 @@ Focus on identifying medicinal herbs, spices, or plant materials commonly used i
         properties: herbInfo.properties,
         alternativeMatches: herbInfo.alternativeMatches || [],
         aiMetadata: {
-          model: 'gemini-1.5-flash',
+          //previous gemini 1.5 flash
+          model: 'gemini-2.5-flash-lite',
           service: 'gemini',
           tokens: {
             input: response.data.usage?.prompt_tokens || 0,
@@ -143,10 +138,10 @@ Focus on identifying medicinal herbs, spices, or plant materials commonly used i
     }
   }
 
-  // Generate remedy using Perplexity Premium
+  // Generate remedy using Gemini
   async generateRemedy(identifiedHerb, userProfile, condition) {
     try {
-      console.log(`💊 Generating remedy using Perplexity for: ${identifiedHerb.name.common} to treat ${condition}`);
+      console.log(`💊 Generating remedy using Gemini for: ${identifiedHerb.name.common} to treat ${condition}`);
 
       const prompt = `As an expert in Ayurvedic medicine, create a comprehensive herbal remedy using ${identifiedHerb.name.common} ${identifiedHerb.name.scientific ? `(${identifiedHerb.name.scientific})` : ''} to treat ${condition}.
 
@@ -187,31 +182,44 @@ Please provide a detailed remedy including:
 
 Ensure the remedy follows traditional Ayurvedic principles and is safe for the specified age and gender. Include relevant Sanskrit terms where appropriate.`;
 
-      const response = await this.makeAPICallWithRetry(this.perplexityBaseURL, {
-        model: this.perplexityModel,
-        messages: [
-          {
-            role: "system",
-            content: "You are an experienced Ayurvedic practitioner with deep knowledge of traditional herbal medicine, herb preparation methods, and safe dosing practices. Provide accurate, safe, and traditional Ayurvedic guidance."
-          },
+      const requestBody = {
+        contents: [
           {
             role: "user",
-            content: prompt,
-          },
+            parts: [
+              {
+                text: "You are an experienced Ayurvedic practitioner with deep knowledge of traditional herbal medicine, herb preparation methods, and safe dosing practices. Provide accurate, safe, and traditional Ayurvedic guidance."
+              },
+              {
+                text: prompt
+              }
+            ]
+          }
         ],
-        max_tokens: 1500,
-        temperature: 0.2
-      }, {
-        headers: {
-          Authorization: `Bearer ${this.perplexityApiKey}`,
-          "Content-Type": "application/json",
-        },
-        timeout: 30000
-      });
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 1500
+        }
+      };
 
-      const remedyText = response.data.choices[0].message.content;
+      const response = await this.makeAPICallWithRetry(
+        `${this.geminiBaseURL}?key=${this.geminiApiKey}`,
+        requestBody,
+        {
+          headers: {
+            "Content-Type": "application/json"
+          },
+          timeout: 30000
+        }
+      );
+
+      if (!response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        throw new Error('Invalid response from Gemini for remedy generation');
+      }
+
+      const remedyText = response.data.candidates[0].content.parts[0].text;
       
-      console.log('✅ Remedy generated successfully using Perplexity');
+      console.log('✅ Remedy generated successfully using Gemini');
 
       // Parse the structured remedy response
       const parsedRemedy = this.parseRemedyResponse(remedyText, identifiedHerb);
@@ -223,11 +231,11 @@ Ensure the remedy follows traditional Ayurvedic principles and is safe for the s
         ayushCompliance: true,
         confidence: identifiedHerb.confidence,
         aiMetadata: {
-          model: this.perplexityModel,
-          service: 'perplexity',
+          model: 'gemini-2.5-flash-lite',
+          service: 'gemini',
           tokens: {
-            input: response.data.usage?.prompt_tokens || 0,
-            output: response.data.usage?.completion_tokens || 0
+            input: response.data.usage?.promptTokenCount || 0,
+            output: response.data.usage?.candidatesTokenCount || 0
           }
         }
       };
@@ -423,7 +431,7 @@ Ensure the remedy follows traditional Ayurvedic principles and is safe for the s
     }
   }
 
-  // Translate remedy text to different languages
+  // Translate remedy text to different languages using Gemini
   async translateRemedy(remedyText, targetLanguage) {
     try {
       console.log(`🌐 Translating remedy to ${targetLanguage}...`);
@@ -453,29 +461,42 @@ ${remedyText}
 
 Translated text in ${targetLangName}:`;
 
-      const response = await this.makeAPICallWithRetry(this.perplexityBaseURL, {
-        model: this.perplexityModel,
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert translator specializing in medical and Ayurvedic texts. Provide accurate translations that maintain the technical and cultural nuances of the original text."
-          },
+      const requestBody = {
+        contents: [
           {
             role: "user",
-            content: prompt,
-          },
+            parts: [
+              {
+                text: "You are an expert translator specializing in medical and Ayurvedic texts. Provide accurate translations that maintain the technical and cultural nuances of the original text."
+              },
+              {
+                text: prompt
+              }
+            ]
+          }
         ],
-        max_tokens: 800,
-        temperature: 0.1
-      }, {
-        headers: {
-          Authorization: `Bearer ${this.perplexityApiKey}`,
-          "Content-Type": "application/json",
-        },
-        timeout: 30000
-      });
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 1500
+        }
+      };
 
-      const translatedText = response.data.choices[0].message.content;
+      const response = await this.makeAPICallWithRetry(
+        `${this.geminiBaseURL}?key=${this.geminiApiKey}`,
+        requestBody,
+        {
+          headers: {
+            "Content-Type": "application/json"
+          },
+          timeout: 30000
+        }
+      );
+
+      if (!response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        throw new Error('Invalid response from Gemini for translation');
+      }
+
+      const translatedText = response.data.candidates[0].content.parts[0].text;
       console.log(`✅ Translation completed for ${targetLanguage}`);
       
       return translatedText;
