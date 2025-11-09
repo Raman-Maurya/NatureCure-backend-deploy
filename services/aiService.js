@@ -5,7 +5,7 @@ import path from 'path';
 class AIService {
   constructor() {
     // Gemini configuration for herb identification and remedy generation
-    this.geminiApiKey = "AIzaSyAq0ugr7Gwm-7VpancppZI3zDIbuIpX7SQ";
+    this.geminiApiKey = "AIzaSyBIN1fCImTtTRLG71YvlP2L2d3piTCXGOc";
     this.geminiBaseURL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
     
     console.log('✅ Gemini API configured for herb identification & remedy generation');
@@ -180,7 +180,8 @@ Please provide a detailed remedy including:
    - Timeline for improvement
    - Signs of effectiveness
 
-Ensure the remedy follows traditional Ayurvedic principles and is safe for the specified age and gender. Include relevant Sanskrit terms where appropriate.`;
+Ensure the remedy follows traditional Ayurvedic principles and is safe for the specified age and gender. Include relevant Sanskrit terms where appropriate.
+The first line should start like - According to Indian Pharmacoepia standard formulation...`;
 
       const requestBody = {
         contents: [
