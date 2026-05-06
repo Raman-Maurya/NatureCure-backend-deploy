@@ -5,7 +5,7 @@ import path from 'path';
 class AIService {
   constructor() {
     // Gemini configuration for herb identification and remedy generation
-    this.geminiApiKey = "AIzaSyDJpkeh-qOl1zxg3_p9Lmo2oAlhXlV0Nhk";
+    this.geminiApiKey = "AIzaSyBLc9AbqhCP5ch-paLu_W_mZmPFJ_uwrIo";
     this.geminiBaseURL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
     
     console.log('✅ Gemini API configured for herb identification & remedy generation');
